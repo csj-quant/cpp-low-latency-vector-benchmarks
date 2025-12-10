@@ -13,12 +13,6 @@ src/
 • vector_growth_analysis.cpp
 • vector_reserve_vs_noreserve.cpp
 
-docs/
-• vector_memory_layout.md
-• vector_invalidation_table.md
-• vector_growth_behavior.md
-• vector_reallocation_log.txt
-
 ---
 
 ## 1. mini_vector<T>
@@ -66,8 +60,6 @@ Logs the capacity for every size from 0 to 64. Your results show:
 
 This fully matches the expected growth pattern of libstdc++.
 
-Details are in docs/vector_growth_behavior.md.
-
 ---
 
 ## 4. Benchmark: reserve vs no reserve
@@ -97,25 +89,7 @@ This is why performance-sensitive systems must preallocate.
 
 ---
 
-## 5. Documentation Included
-
-vector_memory_layout.md
-• explains pointer layout, size, capacity
-• how allocations look in memory
-• how pointer arithmetic works inside vector
-
-vector_invalidation_table.md
-• when iterators, references, and pointers become invalid
-• effects of push_back(), insert(), erase(), reserve(), resize()
-
-vector_growth_behavior.md
-• all empirical growth logs
-• mathematical amortized O(1) proof
-• practical impact for trading systems and low-latency workloads
-
----
-
-## 6. Why This Matters (Quant & HFT Perspective)
+## 5. Why This Matters (Quant & HFT Perspective)
 
 Understanding vector internals is crucial for:
 • predictable latency under heavy throughput
@@ -128,7 +102,7 @@ This repository forms the foundation for later topics like custom allocators, ri
 
 ---
 
-## 7. How to Build and Run
+## 6. How to Build and Run
 
 From build directory:
 
