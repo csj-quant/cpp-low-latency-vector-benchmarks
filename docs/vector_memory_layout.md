@@ -1,18 +1,11 @@
-# ✅ **vector_memory_layout.md**
-
-```
 # Vector Memory Layout (mini_vector<int>)
 
-This document summarizes the observed memory behavior of `mini_vector<int>` during
-push_back operations. The goal is to understand how size, capacity, and memory
-addresses evolve as the vector grows.
+This document summarizes how size, capacity, and memory addresses evolve in `mini_vector<int>` during push_back operations. The data confirms exponential growth and full reallocations.
 
----
+## Size–Capacity Progression (first 20 pushes)
 
-## 1. Size–Capacity Relationship (First 20 Pushes)
+## i    size   capacity
 
-i    size   capacity
----------------------
 0    1      1
 1    2      2
 2    3      4
@@ -33,18 +26,13 @@ i    size   capacity
 17   18     32
 18   19     32
 
-### Interpretation
+Interpretation:
 
-- Capacity grows as `1 → 2 → 4 → 8 → 16 → 32 ...`
-- Between these power-of-two jumps, the capacity stays constant.
-- Size increases by 1 each push, but capacity only grows when size exceeds the current capacity.
-- This demonstrates exponential growth (doubling), the key technique that enables amortized `O(1)` push_back.
+* Capacity doubles: 1 → 2 → 4 → 8 → 16 → 32 → …
+* Between doublings, capacity stays constant.
+* push_back only triggers reallocation when size exceeds current capacity.
 
----
-
-## 2. Memory Reallocation Log
-
-```
+## Reallocation Log (address changes)
 
 size=1  capacity=1    data=0x55e7beb816c0
 size=2  capacity=2    data=0x55e7beb816e0
@@ -57,30 +45,20 @@ size=65 capacity=128  data=0x55e7beb81920
 size=129 capacity=256 data=0x55e7beb81b30
 size=257 capacity=512 data=0x55e7beb81f40
 
-```
+Observations:
 
-### Key Observations
-
-1. **Reallocation happens only when crossing powers of two**  
-   Sizes triggering reallocations:  
-   `1, 2, 3, 5, 9, 17, 33, 65, 129, 257`
-
-2. **Each reallocation changes the base address**  
-   This means:
-   - Data is fully moved to a new block.
-   - All pointers and iterators become invalid.
-
-3. **Memory growth curve is perfectly geometric**  
-   This matches real `std::vector` behavior in most standard libraries.
-
----
+* Reallocations occur when size crosses powers of two.
+  Trigger points: 1, 2, 3, 5, 9, 17, 33, 65, 129, 257
+* Each reallocation moves data to a new address.
+* Confirms: vector uses contiguous memory + exponential growth.
 
 ## Summary
 
-The memory layout confirms:
-- Contiguous storage
-- Exponential growth
-- Full reallocation on expansion
-- Strong alignment with `std::vector` internals
+mini_vector demonstrates classic vector behavior:
 
-Understanding this behavior is essential for low-latency system design, where avoiding reallocations with `reserve()` is often mandatory.
+* geometric capacity growth
+* full reallocation when expanding
+* contiguous memory layout
+* predictable push_back cost (amortized O(1))
+
+---
