@@ -1,0 +1,13 @@
+/home/csjquant/cpp-development/cpp/cpp-low-latency-vector-benchmarks/cmake-build-debug-wsl/vector_reserve_vs_noreserve
+Without reserve:
+ size = 1000000
+ capacity = 1048576
+ time = 0.0064167
+
+With reserve:
+ size = 1000000
+ capacity = 1000000
+ time = 0.00449794
+
+
+ nearly 30 % reduction in time by using "reserve"
