@@ -1,115 +1,192 @@
 # cpp-low-latency-vector-benchmarks
 
-This repository explores the internals of `std::vector` from a low-latency, systems-programming, and quant-developer perspective. It includes a hand-written minimal vector implementation, diagnostics for reallocation behavior, and benchmarks comparing different growth strategies. The goal is to understand how vectors manage memory, how capacity grows, how reallocations impact performance, and why vectors dominate high-performance C++ codebases.
+High-resolution benchmarks and diagnostics for understanding `std::vector` internals, memory layout, growth behavior, iterator invalidation, and low-latency performance impact.
+This project is part of a broader study on writing predictable, high-performance C++ systems for quant and HFT workloads.
 
 ---
 
-## Project Structure
+## 📌 Purpose
 
-src/
-• mini_vector.hpp
-• mini_vector.cpp
-• vector_reallocation_diagnostics.cpp
-• vector_growth_analysis.cpp
-• vector_reserve_vs_noreserve.cpp
+This repository analyzes `std::vector` from a systems and performance perspective:
 
----
+* how memory is allocated and reorganized
+* how capacity grows
+* how many reallocations occur and when
+* how pointer stability and iterator invalidation behave
+* how to avoid latency spikes caused by unexpected growth
+* how manual reservation improves throughput
 
-## 1. mini_vector<T>
-
-A small self-written vector class demonstrating how `std::vector` works internally.
-Features implemented:
-
-• Manual raw allocation using operator new[].
-• Placement-new construction of elements.
-• Manual destruction of objects.
-• push_back(const T&) with automatic growth.
-• reserve(size_t) to grow capacity ahead of time.
-• operator[] for indexed access.
-• Full ownership of a contiguous buffer, similar to libstdc++.
-
-This implementation makes it clear how vectors store `data`, `size`, and `capacity`, and why reallocation invalidates pointers and iterators.
+It also provides a minimal reimplementation of `std::vector` to expose internal mechanisms clearly.
 
 ---
 
-## 2. Reallocation Diagnostics
+## 🧩 Repository Structure
 
-The program prints the vector’s size, capacity, and the address of the underlying buffer after each push_back, revealing exactly when reallocations occur.
-
-Example of your actual output:
-
-size=1 capacity=1 data=0x…
-size=2 capacity=2 data=0x…
-size=3 capacity=4 data=0x…
-size=5 capacity=8 data=0x…
-size=9 capacity=16 data=0x…
-…
-size=257 capacity=512 data=0x…
-
-This confirms exponential growth (1 → 2 → 4 → 8 → …) and amortized O(1) push_back.
-
----
-
-## 3. Vector Growth Analysis
-
-Logs the capacity for every size from 0 to 64. Your results show:
-
-• capacity doubled at sizes 1, 2, 4, 8, 16, 32, 64
-• in-between pushes reused existing capacity
-• no unnecessary allocations
-
-This fully matches the expected growth pattern of libstdc++.
+```
+cpp-low-latency-vector-benchmarks/
+│
+├── src/
+│   ├── mini_vector.hpp
+│   ├── mini_vector.cpp
+│   ├── vector_reallocation_diagnostics.cpp
+│   ├── vector_growth_analysis.cpp
+│   ├── vector_reserve_vs_noreserve.cpp
+│
+└── docs/
+    ├── vector_memory_layout.md
+    ├── vector_invalidation_table.md
+    ├── vector_growth_behavior.md
+```
 
 ---
 
-## 4. Benchmark: reserve vs no reserve
+## 🚀 Implemented Components
 
-Two tests were run for inserting 1,000,000 integers.
+### 1. `mini_vector<T>`
 
-Without reserve():
-• size: 1,000,000
-• capacity: 1,048,576
-• reallocations: many
-• time: 0.0064167 seconds
+A minimal implementation of a dynamic array exposing the fundamentals of:
 
-With reserve(1’000’000):
-• size: 1,000,000
-• capacity: 1,000,000
-• reallocations: zero
-• time: 0.00449794 seconds
+* raw allocation using `operator new[]`
+* element construction via placement-new
+* destruction using explicit destructor calls
+* manual capacity management
+* reallocation on push-back
 
-Reserve is significantly faster because:
-• no reallocation spikes
-• no copying/moving of elements
-• consistent memory address
-• better cache behavior
-• zero allocator calls during growth
+This component mirrors how `std::vector` operates internally, allowing precise observation of:
 
-This is why performance-sensitive systems must preallocate.
+* pointer changes
+* capacity doubling
+* move vs copy behavior
+* growth sequences
 
 ---
 
-## 5. Why This Matters (Quant & HFT Perspective)
+### 2. Reallocation Diagnostics
 
-Understanding vector internals is crucial for:
-• predictable latency under heavy throughput
-• eliminating hidden allocations
-• optimizing cache locality
-• writing high-performance order-book and market-data pipelines
-• system-design performance interviews (HRT, Citadel, Jane Street, IMC)
+`vector_reallocation_diagnostics.cpp` prints the address of `data_` during early growth:
 
-This repository forms the foundation for later topics like custom allocators, ring buffers, arena memory, and lock-free development.
+```
+size=1  capacity=1    data=0x...
+size=2  capacity=2    data=0x...
+size=3  capacity=4    data=0x...
+size=5  capacity=8    data=0x...
+...
+```
+
+This confirms that:
+
+* capacity follows a doubling strategy
+* every growth event produces a **new memory block**
+* all existing elements are moved during the event
 
 ---
 
-## 6. How to Build and Run
+### 3. Growth Pattern Analysis
 
-From build directory:
+`vector_growth_analysis.cpp` logs size–capacity pairs:
 
+```
+0 → 1  
+1 → 1  
+2 → 2  
+3 → 4  
+4 → 4  
+5 → 8  
+...
+```
+
+The measurements confirm exponential growth:
+
+```
+1 → 2 → 4 → 8 → 16 → 32 → …
+```
+
+This matches the behavior of libstdc++ and libc++.
+
+---
+
+### 4. Reserve vs No Reserve Benchmark
+
+`vector_reserve_vs_noreserve.cpp` compares runtime for 1,000,000 pushes:
+
+| Case            | Final Capacity | Time (seconds) |
+| --------------- | -------------- | -------------- |
+| Without reserve | 1,048,576      | 0.0064167      |
+| With reserve    | 1,000,000      | 0.00449794     |
+
+Key takeaways:
+
+* Reserving capacity avoids all intermediate reallocations
+* Performance improved by nearly **30%** in this experiment
+* Latency stability improves significantly
+* This reinforces why HFT code always pre-allocates
+
+---
+
+## 📄 Documentation (docs/)
+
+### **vector_memory_layout.md**
+
+Explains the internal structure:
+
+* `begin()` pointer
+* size
+* capacity
+* contiguous memory guarantees
+* pointer arithmetic
+
+### **vector_invalidation_table.md**
+
+Describes exactly which operations invalidate:
+
+* pointers
+* references
+* iterators
+
+### **vector_growth_behavior.md**
+
+Summarizes actual measured growth behavior:
+
+* full size–capacity table
+* reallocation log
+* interpretation of doubling strategy
+* analysis of reserve vs non-reserve behavior
+
+---
+
+## 🧪 Key Insights
+
+* `std::vector` reallocates only on boundary crossings (power-of-two points).
+* Reallocation moves all elements and invalidates all iterators.
+* Doubling growth ensures amortized O(1) push_back.
+* Pre-reserving memory eliminates unpredictable spikes in latency.
+* Contiguous storage yields superior cache locality, crucial for low-latency systems.
+
+---
+
+## 🔧 Build Instructions
+
+```
+mkdir -p build
+cd build
 cmake ..
-make
+make -j8
+```
 
 Executables:
-• vector_reallocation_diagnostics
-• vector_growth_analysis
-• vector_reserve_vs_noreserve
+
+* `vector_reallocation_diagnostics`
+* `vector_growth_analysis`
+* `vector_reserve_vs_noreserve`
+
+---
+
+## 📦 Future Additions
+
+This repository will expand to include:
+
+* improved mini_vector with move-only types
+* allocator benchmarking
+* small-buffer optimization (SBO/SSO) analysis
+* contiguous vs non-contiguous container comparisons
+* cache-line–aware profiling
